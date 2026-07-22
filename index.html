@@ -61,6 +61,78 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
     transition: opacity 0.3s; z-index: 100;
 }
 .toast.show { opacity: 1; }
+
+/* Comment Section Styles */
+.comments-section {
+    margin-top: 20px;
+    border-top: 1px solid #e8b4f0;
+    padding-top: 16px;
+}
+.comments-section h4 {
+    font-size: 0.95rem;
+    color: #6b21a8;
+    margin-bottom: 12px;
+}
+.comment-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.comment-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #e8b4f0;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+}
+.comment-form input:focus {
+    border-color: #a855f7;
+}
+.comment-form button {
+    background: linear-gradient(135deg, #e879a8, #a855f7);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.comment-form button:hover { opacity: 0.85; }
+.comment-list {
+    list-style: none;
+    padding: 0;
+}
+.comment-item {
+    background: #fdf4ff;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #374151;
+    position: relative;
+}
+.comment-item .comment-name {
+    font-weight: bold;
+    color: #6b21a8;
+    margin-right: 8px;
+}
+.comment-item .comment-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+.comment-item .comment-delete {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.5;
+}
+.comment-item .comment-delete:hover { opacity: 1; }
 </style>
 </head>
 <body>
@@ -77,12 +149,23 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
     </div>
 
     <div id="posts">
-        <div class="post">
+        <div class="post" id="post-ootd">
             <div class="post-title" contenteditable="true">OOTD of the Summer &#9728;&#65039;</div>
             <div class="post-date">Summer 2026</div>
-            <img class="post-img" src="./girl%20bathinsuit.jpeg" alt="Summer OOTD">
+            <img class="post-img" src="girl%20bathinsuit.jpeg" alt="Summer OOTD">
             <div class="post-body" contenteditable="true">Summer vibes! Drop your favourite summer looks in the comments. Click here to edit this text and write your own caption.</div>
             <button class="delete-btn" aria-label="Delete">&times;</button>
+
+            <!-- Comment Section -->
+            <div class="comments-section">
+                <h4>&#128172; Comments</h4>
+                <div class="comment-form">
+                    <input type="text" id="comment-name-ootd" placeholder="Your name">
+                    <input type="text" id="comment-text-ootd" placeholder="Write a comment...">
+                    <button onclick="addComment('ootd')">Post</button>
+                </div>
+                <ul class="comment-list" id="comments-ootd"></ul>
+            </div>
         </div>
     </div>
 </div>
@@ -92,6 +175,7 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
 <script>
 (function() {
     var STORAGE_KEY = "leas_blog_v1";
+    var COMMENTS_KEY = "leas_blog_comments";
     var postsContainer = document.getElementById("posts");
     var toast = document.getElementById("toast");
 
@@ -108,6 +192,71 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
         return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
     }
 
+    function getTimeStr() {
+        var d = new Date();
+        var h = d.getHours();
+        var m = d.getMinutes();
+        var ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12; h = h ? h : 12;
+        m = m < 10 ? "0" + m : m;
+        return h + ":" + m + " " + ampm;
+    }
+
+    // --- Comment System ---
+    window.addComment = function(postId) {
+        var nameInput = document.getElementById("comment-name-" + postId);
+        var textInput = document.getElementById("comment-text-" + postId);
+        var name = nameInput.value.trim();
+        var text = textInput.value.trim();
+        if (!text) return;
+        if (!name) name = "Anonymous";
+
+        var comments = loadComments(postId);
+        comments.push({ name: name, text: text, time: getDateStr() + " " + getTimeStr() });
+        saveComments(postId, comments);
+        renderComments(postId);
+        nameInput.value = "";
+        textInput.value = "";
+        showToast("Comment posted!");
+    };
+
+    window.deleteComment = function(postId, index) {
+        var comments = loadComments(postId);
+        comments.splice(index, 1);
+        saveComments(postId, comments);
+        renderComments(postId);
+    };
+
+    function loadComments(postId) {
+        try {
+            var data = localStorage.getItem(COMMENTS_KEY + "_" + postId);
+            return data ? JSON.parse(data) : [];
+        } catch(e) { return []; }
+    }
+
+    function saveComments(postId, comments) {
+        try {
+            localStorage.setItem(COMMENTS_KEY + "_" + postId, JSON.stringify(comments));
+        } catch(e) {}
+    }
+
+    function renderComments(postId) {
+        var list = document.getElementById("comments-" + postId);
+        if (!list) return;
+        var comments = loadComments(postId);
+        list.innerHTML = "";
+        for (var i = 0; i < comments.length; i++) {
+            var li = document.createElement("li");
+            li.className = "comment-item";
+            li.innerHTML = '<span class="comment-name">' + comments[i].name + '</span>' +
+                '<span class="comment-time">' + comments[i].time + '</span>' +
+                '<button class="comment-delete" onclick="deleteComment(\'ootd\', ' + i + ')">&times;</button>' +
+                '<p style="margin:4px 0 0 0;">' + comments[i].text + '</p>';
+            list.appendChild(li);
+        }
+    }
+
+    // --- Blog Post System ---
     function createPost(title, date, body) {
         var div = document.createElement("div");
         div.className = "post";
@@ -156,9 +305,7 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
 
     function loadData() {
         try {
-            var d = localStorage.getItem(STORAGE_KEY);
             var t = localStorage.getItem(STORAGE_KEY + "_title");
-            if (d) postsContainer.innerHTML = d;
             if (t) document.getElementById("blog-title").textContent = t;
             var btns = postsContainer.querySelectorAll(".delete-btn");
             for (var i = 0; i < btns.length; i++) {
@@ -179,7 +326,18 @@ header p { color: rgba(255,255,255,0.85); font-style: italic; margin-top: 8px; }
         timer = setTimeout(saveData, 2000);
     });
 
+    // Also allow Enter key to submit comment
+    var commentInputs = document.querySelectorAll(".comment-form input");
+    for (var i = 0; i < commentInputs.length; i++) {
+        commentInputs[i].addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                this.parentElement.querySelector("button").click();
+            }
+        });
+    }
+
     loadData();
+    renderComments("ootd");
 })();
 </script>
 </body>
